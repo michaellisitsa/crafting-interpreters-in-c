@@ -16,6 +16,7 @@ typedef struct {
   int count;
   int capacity;
   uint8_t *code;
+  int *lines;
   // This is a sub dynamic array inside this main one.
   // Here we can create arbitrarily nested data structures.
   // We store all the constants we need.
@@ -28,7 +29,7 @@ typedef struct {
 void initChunk(Chunk *chunk);
 void freeChunk(Chunk *chunk);
 
-void writeChunk(Chunk *chunk, uint8_t byte);
+void writeChunk(Chunk *chunk, uint8_t byte, int line);
 // We define a shortcut for double in value, that we use here.
 // Later the type of a constant will be exp[andedfhhh
 int addConstant(Chunk *chunk, Value value);

@@ -9,12 +9,13 @@ void initChunk(Chunk *chunk) {
   chunk->capacity = 0;
   // Start off completely empty
   chunk->code = NULL;
+  chunk->lines = NULL;
   // If we initialize it here, then who's responsible for its lifetime;
   // Why do we need to pass the pointer to the chunk
   initValueArray(&chunk->constants);
 }
 
-void writeChunk(Chunk *chunk, uint8_t byte) {
+void writeChunk(Chunk *chunk, uint8_t byte, int line) {
   // Does the array have capacity for this byte;
   if (chunk->capacity < chunk->count + 1) {
     // Does this copy the capacity?
@@ -22,9 +23,11 @@ void writeChunk(Chunk *chunk, uint8_t byte) {
     chunk->capacity = GROW_CAPACITY(oldCapacity);
     chunk->code =
         GROW_ARRAY(uint8_t, chunk->code, oldCapacity, chunk->capacity);
+    chunk->lines = GROW_ARRAY(int, chunk->lines, oldCapacity, chunk->capacity);
   }
   // If not grow the array to make room
   chunk->code[chunk->count] = byte;
+  chunk->lines[chunk->count] = line;
   chunk->count++;
 }
 
@@ -32,6 +35,7 @@ void freeChunk(Chunk *chunk) {
   // I guess we're freeing the entire memory. Why does it care to know the whole
   // capacity?
   FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
+  FREE_ARRAY(uint8_t, chunk->lines, chunk->capacity);
   freeValueArray(&chunk->constants);
   initChunk(chunk);
   // Use the same reallocate function with a different macro
