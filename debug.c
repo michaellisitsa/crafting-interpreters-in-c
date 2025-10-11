@@ -18,7 +18,12 @@ int disassembleInstruction(Chunk *chunk, int offset) {
   uint8_t instruction = chunk->code[offset];
   switch (instruction) {
   case OP_RETURN:
+    // How do we print the next chunk if its a constant?
     return simpleInstruction("OP_RETURN", offset);
+  case LOAD_CONST:
+    // Not sure what we do yet, maybe just print the value from the memory
+    // address.
+    return simpleInstruction("LOAD_CONST", offset + 1);
   default:
     printf("Unknown OpCode %d\n", instruction);
     return offset + 1;

@@ -7,6 +7,8 @@
 #include "common.h"
 #define GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity) * 2)
 
+// Why don't we use a return statement to return the value
+// Because it's just text substitution
 #define GROW_ARRAY(type, pointer, oldCount, newCount)                          \
   (type *)reallocate(pointer, sizeof(type) * (oldCount),                       \
                      sizeof(type) * (newCount))

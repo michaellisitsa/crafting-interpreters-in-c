@@ -8,6 +8,9 @@ void initChunk(Chunk *chunk) {
   chunk->capacity = 0;
   // Start off completely empty
   chunk->code = NULL;
+  // If we initialize it here, then who's responsible for its lifetime;
+  // Why do we need to pass the pointer to the chunk
+  initValueArray(&chunk->constants);
 }
 
 void writeChunk(Chunk *chunk, uint8_t byte) {
@@ -30,4 +33,10 @@ void freeChunk(Chunk *chunk) {
   FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
   initChunk(chunk);
   // Use the same reallocate function with a different macro
+}
+
+int addConstant(Chunk *chunk, double constant) {
+  // Store the value in the value array
+  // Return the position in the array
+  return 0;
 }
