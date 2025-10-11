@@ -20,8 +20,7 @@ void initValueArray(ValueArray *array);
 // internally to the function.
 void writeValueArray(ValueArray *array, Value value);
 // TODO: add a free array method
-// void freeValueArray(ValueArray *array);
-//
 void freeValueArray(ValueArray *array);
+void printValue(Value value);
 
 #endif

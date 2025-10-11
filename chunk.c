@@ -1,5 +1,6 @@
 #include "chunk.h"
 #include "memory.h"
+#include "value.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -31,12 +32,15 @@ void freeChunk(Chunk *chunk) {
   // I guess we're freeing the entire memory. Why does it care to know the whole
   // capacity?
   FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
+  freeValueArray(&chunk->constants);
   initChunk(chunk);
   // Use the same reallocate function with a different macro
 }
 
-int addConstant(Chunk *chunk, double constant) {
+int addConstant(Chunk *chunk, Value value) {
   // Store the value in the value array
   // Return the position in the array
-  return 0;
+  ValueArray *values = &chunk->constants;
+  writeValueArray(values, value);
+  return (*values).count - 1;
 }

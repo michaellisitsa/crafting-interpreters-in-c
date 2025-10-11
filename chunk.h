@@ -6,8 +6,8 @@
 
 // Op codes we will use
 typedef enum {
+  OP_CONSTANT,
   OP_RETURN,
-  LOAD_CONST,
 } OpCode;
 
 // Wrapper around an array of bytes
@@ -29,5 +29,7 @@ void initChunk(Chunk *chunk);
 void freeChunk(Chunk *chunk);
 
 void writeChunk(Chunk *chunk, uint8_t byte);
-int addConstant(Chunk *chunk, double constant);
+// We define a shortcut for double in value, that we use here.
+// Later the type of a constant will be exp[andedfhhh
+int addConstant(Chunk *chunk, Value value);
 #endif
