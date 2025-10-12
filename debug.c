@@ -1,4 +1,5 @@
 #include "debug.h"
+#include "chunk.h"
 #include "value.h"
 #include <stdio.h>
 
@@ -38,6 +39,16 @@ int disassembleInstruction(Chunk *chunk, int offset) {
     // Not sure what we do yet, maybe just print the value from the memory
     // address.
     return constantInstruction("OP_CONSTANT", chunk, offset);
+  case OP_NEGATE:
+    return simpleInstruction("OP_NEGATE", offset);
+  case OP_ADD:
+    return simpleInstruction("OP_ADD", offset);
+  case OP_SUBTRACT:
+    return simpleInstruction("OP_SUBTRACT", offset);
+  case OP_MULTIPLY:
+    return simpleInstruction("OP_MULTIPLY", offset);
+  case OP_DIVIDE:
+    return simpleInstruction("OP_DIVIDE", offset);
   default:
     printf("Unknown OpCode %d\n", instruction);
     return offset + 1;
