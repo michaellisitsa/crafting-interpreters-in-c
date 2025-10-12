@@ -13,5 +13,6 @@ add_executable(myprogram
 	memory.c
 	debug.c
 	value.c
+	vm.c
 )
 
