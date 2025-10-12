@@ -1,12 +1,26 @@
 #ifndef clox_vm_h
 #define clox_vm_h
 
+#include "value.h"
+#define STACK_MAX 256
+
 #include "chunk.h"
 
 typedef struct {
   Chunk *chunk;
   // pointer because it points into a location in the chunk array
   uint8_t *ip;
+  // Interesting stackoverflow about Python's approach to store this
+  // https://stackoverflow.com/questions/44346433/in-c-python-accessing-the-bytecode-evaluation-stack
+  // Python stores this in PyFrameObject->f_valuestack
+  // https://github.com/python/cpython/blob/2.7/Include/frameobject.h#L23
+  // Also excellent explanation of the PyFrameObject
+  // https://shanechang.com/p/python-frames-systems-programming-connection/
+  Value stack[STACK_MAX];
+  // Python stores this in stack_pointer local variable
+  //  Note this is a pointer to the top of the stack
+  // https://github.com/python/cpython/blob/v3.8.2/Python/ceval.c#L1153
+  Value *stackTop;
 } VM;
 
 typedef enum {
@@ -18,6 +32,8 @@ typedef enum {
 void initVM();
 void freeVM();
 InterpretResult interpret(Chunk *chunk);
+void push(Value value);
+Value pop();
 static InterpretResult run();
 
 #endif
