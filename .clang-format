@@ -1,0 +1,17 @@
+
+# Checkout config tool: https://zed0.co.uk/clang-format-configurator/
+# Or http://cf.monofraps.net/
+# https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+# https://github.com/01org/parameter-framework/blob/master/.clang-format
+
+# Tested on: clang-format version 6.0.1
+
+
+# Common settings
+BasedOnStyle:  LLVM
+TabWidth:        4
+IndentWidth:     4
+UseTab:          Always
+ColumnLimit: 100
+
+# Other languages JavaScript, Proto

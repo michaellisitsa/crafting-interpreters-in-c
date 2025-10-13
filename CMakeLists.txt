@@ -14,5 +14,7 @@ add_executable(myprogram
 	debug.c
 	value.c
 	vm.c
+	scanner.c
+	compiler.c
 )
 
