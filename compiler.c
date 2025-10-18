@@ -225,6 +225,7 @@ static void parsePrecedence(Precedence precedence) {
 
 	// Here we're going to call the infix function so it can generate some bytecode recursively
 	// inside 'expression'
+	Precedence precendenceCompare = getRule(parser.current.type)->precedence;
 	while (precedence <= getRule(parser.current.type)->precedence) {
 		advance();
 		ParseFn infixRule = getRule(parser.previous.type)->infix;
