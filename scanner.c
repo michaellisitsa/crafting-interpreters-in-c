@@ -232,5 +232,6 @@ Token scanToken() {
 	}
 	if (isAtEnd())
 		return makeToken(TOKEN_EOF);
+	fprintf(stderr, "Invalid token %c\n", c);
 	return errorToken("Unexpected Character.");
 }

@@ -16,5 +16,6 @@ add_executable(myprogram
 	vm.c
 	scanner.c
 	compiler.c
+	object.c
 )
 

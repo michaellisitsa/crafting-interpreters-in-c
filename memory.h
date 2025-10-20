@@ -5,16 +5,18 @@
 // straight to eight elements instead of starting at one. That avoids a little
 // extra memory churn when the array is very small
 #include "common.h"
+// This looks like a specialized version of reallocate to allocate an empty array for a string
+#define ALLOCATE(type, count) (type *)reallocate(NULL, 0, sizeof(type) * (count))
+
 #define GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity) * 2)
 
 // Why don't we use a return statement to return the value
 // Because it's just text substitution
-#define GROW_ARRAY(type, pointer, oldCount, newCount)                          \
-  (type *)reallocate(pointer, sizeof(type) * (oldCount),                       \
-                     sizeof(type) * (newCount))
+#define GROW_ARRAY(type, pointer, oldCount, newCount)                                              \
+	(type *)reallocate(pointer, sizeof(type) * (oldCount), sizeof(type) * (newCount))
 
-#define FREE_ARRAY(type, pointer, oldCount)                                    \
-  (type *)reallocate(pointer, sizeof(type) * (oldCount), 0)
+#define FREE_ARRAY(type, pointer, oldCount)                                                        \
+	(type *)reallocate(pointer, sizeof(type) * (oldCount), 0)
 
 void *reallocate(void *pointer, size_t oldSize, size_t newSize);
 
