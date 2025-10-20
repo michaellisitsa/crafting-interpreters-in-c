@@ -190,6 +190,8 @@ static Token string() {
 Token scanToken() {
 	skipWhitespace();
 	scanner.start = scanner.current;
+	if (isAtEnd())
+		return makeToken(TOKEN_EOF);
 	char c = advance();
 	if (isDigit(c))
 		return number();
@@ -230,8 +232,6 @@ Token scanToken() {
 	case '"':
 		return string();
 	}
-	if (isAtEnd())
-		return makeToken(TOKEN_EOF);
 	fprintf(stderr, "Invalid token %c\n", c);
 	return errorToken("Unexpected Character.");
 }
