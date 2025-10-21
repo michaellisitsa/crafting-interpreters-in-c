@@ -19,6 +19,8 @@ typedef enum {
 
 struct Obj {
 	ObjType type;
+	// pointer to next Obj in the chain
+	struct Obj *next;
 };
 
 struct ObjString {
@@ -28,6 +30,7 @@ struct ObjString {
 	char *chars;
 };
 
+ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);
 
 void printObject(Value value);
