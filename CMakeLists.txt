@@ -17,5 +17,6 @@ add_executable(myprogram
 	scanner.c
 	compiler.c
 	object.c
+	table.c
 )
 
