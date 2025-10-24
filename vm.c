@@ -28,9 +28,17 @@ static void runtimeError(const char *format, ...) {
 	fprintf(stderr, "[line %d] in script\n", line);
 	resetStack();
 }
-void initVM() { resetStack(); }
+void initVM() {
+	resetStack();
+	vm.objects = NULL;
+	// We pass a pointer to the vm strings table,
+	initTable(&vm.strings);
+}
 
-void freeVM() { freeObjects(); }
+void freeVM() {
+	freeTable(&vm.strings);
+	freeObjects();
+}
 
 void push(Value value) {
 	*vm.stackTop = value;
