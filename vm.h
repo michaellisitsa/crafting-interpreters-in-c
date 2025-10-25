@@ -22,6 +22,7 @@ typedef struct {
 	//  Note this is a pointer to the top of the stack
 	// https://github.com/python/cpython/blob/v3.8.2/Python/ceval.c#L1153
 	Value *stackTop;
+	Table globals;
 	Table strings;
 	// This will allow us to see the head of the list
 	// so we can navigate along all objects. We need a global variable to store the head to start
