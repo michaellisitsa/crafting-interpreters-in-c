@@ -5,6 +5,7 @@
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
+#include "table.h"
 #include "value.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -149,6 +150,16 @@ static InterpretResult run() {
 			ObjString *name = READ_STRING();
 			tableSet(&vm.globals, name, peek(0));
 			pop();
+			break;
+		}
+		case OP_SET_GLOBAL: {
+			ObjString *name = READ_STRING();
+			if (tableSet(&vm.globals, name, peek(0))) {
+				// It must already exist if its being set.
+				tableDelete(&vm.globals, name);
+				runtimeError("Undefined variable '%s'.", name->chars);
+				return INTERPRET_RUNTIME_ERROR;
+			}
 			break;
 		}
 		case OP_EQUAL: {
