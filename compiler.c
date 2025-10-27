@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
 #endif
@@ -36,7 +37,17 @@ typedef struct {
 	ParseFn infix;
 	Precedence precedence;
 } ParseRule;
+typedef struct {
+	Token name;
+	int depth;
+} Local;
+typedef struct {
+	Local locals[UINT8_COUNT];
+	int localCount;
+	int scopeDepth;
+} Compiler;
 Parser parser;
+Compiler *current = NULL;
 Chunk *compilingChunk;
 
 static Chunk *currentChunk() { return compilingChunk; }
@@ -118,8 +129,14 @@ static uint8_t makeConstant(Value value) {
 }
 
 static void emitConstant(Value value) { emitBytes(OP_CONSTANT, makeConstant(value)); }
+static void initCompiler(Compiler *compiler) {
+	compiler->localCount = 0;
+	compiler->scopeDepth = 0;
+	current = compiler;
+}
 static void endCompiler() {
 	emitReturn();
+
 #ifdef DEBUG_PRINT_CODE
 	if (!parser.hadError) {
 		disassembleChunk(currentChunk(), "code");
@@ -127,6 +144,19 @@ static void endCompiler() {
 #endif
 }
 
+static void beginScope() { current->scopeDepth++; }
+
+static void endScope() {
+	current->scopeDepth--;
+	// We want to remove all local positions we were storing
+	// Sinced the compiler is mirroring the vm locals indices,
+	// it now needs to go back to the outer scope and only keep the variables still in scope
+	while (current->localCount > 0 &&
+		   current->locals[current->localCount - 1].depth > current->scopeDepth) {
+		emitByte(OP_POP);
+		current->localCount--;
+	}
+}
 // Global variable forward declaration
 // The order of function declarations means some functions have to be forward declared
 static void expression();
@@ -137,15 +167,68 @@ static ParseRule *getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
 static void expression() { parsePrecedence(PREC_ASSIGNMENT); }
+static void block() {
+	while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+		declaration();
+	}
+	consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+}
 static uint8_t identifierConstant(Token *name) {
 	return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
 }
+static bool identifiersEqual(Token *a, Token *b) {
+	if (a->length != b->length)
+		return false;
+	return memcmp(a->start, b->start, a->length) == 0;
+}
+// We get the next value from the locals array and fill it in.
+static void addLocal(Token name) {
+	if (current->localCount == UINT8_COUNT) {
+		error("Too many local variables in function.");
+		return;
+	}
+	Local *local = &current->locals[current->localCount++];
+	local->name = name;
+	local->depth = current->scopeDepth;
+}
 
+static void declareVariable() {
+	if (current->scopeDepth == 0)
+		return;
+
+	Token *name = &parser.previous;
+	// We don't want 2 variables declared in the same scope
+	// Different scopes is fine, as that's shadowing
+	for (int i = current->localCount - 1; i >= 0; i--) {
+		Local *local = &current->locals[i];
+		if (local->depth != -1 && local->depth < current->scopeDepth) {
+			break;
+		}
+
+		if (identifiersEqual(name, &local->name)) {
+			error("Already a variable with this name in this scope.");
+		}
+	}
+	addLocal(*name);
+}
 static uint8_t parseVariable(const char *errorMessage) {
 	consume(TOKEN_IDENTIFIER, errorMessage);
+	declareVariable();
+	// We are not interested in local variables here
+	// Locals are looked up by index rather than name at runtime
+	if (current->scopeDepth > 0)
+		return 0;
 	return identifierConstant(&parser.previous);
 }
-static void defineVariable(uint8_t global) { emitBytes(OP_DEFINE_GLOBAL, global); }
+static void defineVariable(uint8_t global) {
+	// In the VM, the stack top will have the value on the RHS of the assignment
+	// So we don't need to do anything as the variable will be right where it needs to be
+	// The compiler will have pointed the bytecode here
+	if (current->scopeDepth > 0) {
+		return;
+	}
+	emitBytes(OP_DEFINE_GLOBAL, global);
+}
 static void varDeclaration() {
 	uint8_t global = parseVariable("Expect variable name.");
 
@@ -202,6 +285,10 @@ static void declaration() {
 static void statement() {
 	if (match(TOKEN_PRINT)) {
 		printStatement();
+	} else if (match(TOKEN_LEFT_BRACE)) {
+		beginScope();
+		block();
+		endScope();
 	} else {
 		expressionStatement();
 	}
@@ -375,6 +462,8 @@ static void parsePrecedence(Precedence precedence) {
 static ParseRule *getRule(TokenType type) { return &rules[type]; }
 bool compile(const char *source, Chunk *chunk) {
 	initScanner(source);
+	Compiler compiler;
+	initCompiler(&compiler);
 	// I guess this is useful for future when we compile multiple chunks / functions
 	compilingChunk = chunk;
 	parser.hadError = false;
