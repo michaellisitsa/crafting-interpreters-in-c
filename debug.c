@@ -12,9 +12,22 @@ void disassembleChunk(Chunk *chunk, const char *name) {
 
 static int simpleInstruction(const char *name, int offset) {
 	printf("%s\n", name);
+	// What's the next bytecode to show.
 	return offset + 1;
 }
+static int byteInstruction(const char *name, Chunk *chunk, int offset) {
+	// We want to get the values in the locals array, i.e. the name and scope depth
+	// But we're debugging the vm. So we don't have that info
+	// So we just get the value of the arg to the op code which will point us to the slot in the
+	// locals array
+	uint8_t slot = chunk->code[offset + 1];
+	printf("%-16s %4d\n", name, slot);
+	return offset + 1;
+}
+
 static int constantInstruction(const char *name, Chunk *chunk, int offset) {
+	// Same as simple instruction but also print the item at the location
+	// of the constants array at the offset
 	uint8_t constant = chunk->code[offset + 1];
 	printf("%-16s %4d '", name, constant);
 	printValue(chunk->constants.values[constant]);
@@ -49,6 +62,10 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 		return simpleInstruction("OP_FALSE", offset);
 	case OP_POP:
 		return simpleInstruction("OP_POP", offset);
+	case OP_GET_LOCAL:
+		return byteInstruction("OP_GET_LOCAL", chunk, offset);
+	case OP_SET_LOCAL:
+		return byteInstruction("OP_SET_LOCAL", chunk, offset);
 	case OP_GET_GLOBAL:
 		return constantInstruction("OP_GET_GLOBAL", chunk, offset);
 	case OP_DEFINE_GLOBAL:

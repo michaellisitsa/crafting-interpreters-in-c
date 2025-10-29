@@ -181,6 +181,23 @@ static bool identifiersEqual(Token *a, Token *b) {
 		return false;
 	return memcmp(a->start, b->start, a->length) == 0;
 }
+static int resolveLocal(Compiler *compiler, Token *name) {
+	for (int i = compiler->localCount - 1; i >= 0; i--) {
+		// &compiler->locals would give an array pointer
+		// a special pointer type that points at the array as a whole
+		// but without '&' it decays to a pointer to the first element
+		// https://stackoverflow.com/a/44524152
+		// We want to point into a specific location in the locals array
+		Local *local = &compiler->locals[i];
+		if (identifiersEqual(&local->name, name)) {
+			if (local->depth == -1) {
+				error("Can't read local variable in its own initializer");
+			}
+			return i;
+		}
+	}
+	return -1;
+}
 // We get the next value from the locals array and fill it in.
 static void addLocal(Token name) {
 	if (current->localCount == UINT8_COUNT) {
@@ -189,7 +206,7 @@ static void addLocal(Token name) {
 	}
 	Local *local = &current->locals[current->localCount++];
 	local->name = name;
-	local->depth = current->scopeDepth;
+	local->depth = -1;
 }
 
 static void declareVariable() {
@@ -220,11 +237,21 @@ static uint8_t parseVariable(const char *errorMessage) {
 		return 0;
 	return identifierConstant(&parser.previous);
 }
+static void markInitialized() {
+
+	// We want to set the local depth to the current depth
+	// Local should live at the localsCount index of the array - 1
+	current->locals[current->localCount - 1].depth = current->scopeDepth;
+}
 static void defineVariable(uint8_t global) {
 	// In the VM, the stack top will have the value on the RHS of the assignment
 	// So we don't need to do anything as the variable will be right where it needs to be
 	// The compiler will have pointed the bytecode here
 	if (current->scopeDepth > 0) {
+		// We mark the variable as initialized which sets the scope depth to the current
+		// which we previously did in addLocal which leads to problems with referencing a variable
+		// in its declaration
+		markInitialized();
 		return;
 	}
 	emitBytes(OP_DEFINE_GLOBAL, global);
@@ -361,14 +388,22 @@ static void string(bool canAssign) {
 	emitConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
 static void namedVariable(Token name, bool canAssign) {
-	uint8_t arg = identifierConstant(&name);
+	uint8_t getOp, setOp;
+	int arg = resolveLocal(current, &name);
+	if (arg != -1) {
+		getOp = OP_GET_LOCAL;
+		setOp = OP_SET_LOCAL;
+	} else {
+		arg = identifierConstant(&name);
+		getOp = OP_GET_GLOBAL;
+		setOp = OP_SET_GLOBAL;
+	}
 	if (canAssign && match(TOKEN_EQUAL)) {
 		expression();
-		emitBytes(OP_SET_GLOBAL, arg);
+		emitBytes(setOp, arg);
 	} else {
-		emitBytes(OP_GET_GLOBAL, arg);
+		emitBytes(getOp, arg);
 	}
-	emitBytes(OP_GET_GLOBAL, arg);
 }
 static void variable(bool canAssign) { namedVariable(parser.previous, canAssign); }
 
