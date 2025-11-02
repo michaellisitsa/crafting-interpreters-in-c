@@ -117,6 +117,10 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
 }
 
 static void emitLoop(int loopStart) {
+	// Very similar to emitJump and patchJump together. This is likely becuase
+	// we're jumping backwards so we use normal C variables to track the the loop start
+	// and by the time this op code comes around, we can write it and its operand at once without
+	// patching.
 	emitByte(OP_LOOP);
 
 	int offset = currentChunk()->count - loopStart + 2;
@@ -323,6 +327,61 @@ static void expressionStatement() {
 	emitByte(OP_POP);
 }
 
+static void forStatement() {
+	beginScope();
+	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+	if (match(TOKEN_SEMICOLON)) {
+		// for (;  ...)
+		// No initializer.
+	} else if (match(TOKEN_VAR)) {
+		// for (THIS statement; ...)
+		varDeclaration();
+	} else {
+		expressionStatement();
+	}
+
+	int loopStart = currentChunk()->count;
+	int exitJump = -1;
+	if (!match(TOKEN_SEMICOLON)) {
+		expression();
+		consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+
+		// Jump out of the loop if the condition is false.
+		exitJump = emitJump(OP_JUMP_IF_FALSE);
+		emitByte(OP_POP); // Condition.
+	}
+
+	// Increment clause
+	// We jump back to the increment after the loop to perform the action
+	// We advance past the ')', if we match it, we also emit the bytecode for the expression
+	if (!match(TOKEN_RIGHT_PAREN)) {
+		// We have to jump over the increment expression unconditionally.
+		// It is executed after the body only
+		// We therefore need to record where the jump should go, i.e. after the expression()
+		// I guess at the end of the loop, we have to jump back to this point to actually call this.
+		int bodyJump = emitJump(OP_JUMP);
+		int incrementStart = currentChunk()->count;
+		expression();
+		emitByte(OP_POP);
+		consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+
+		// Unconditionally jump backwards to the start of the loop,
+		// To evaluate the condition.
+		emitLoop(loopStart);
+		loopStart = incrementStart;
+		patchJump(bodyJump);
+	}
+	statement();
+	emitLoop(loopStart);
+
+	// If there's a condition clause, we patch the jump.
+	if (exitJump != -1) {
+		patchJump(exitJump);
+		emitByte(OP_POP); // Condition.
+	}
+	endScope();
+}
+
 static void ifStatement() {
 	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
 	expression();
@@ -400,6 +459,8 @@ static void declaration() {
 static void statement() {
 	if (match(TOKEN_PRINT)) {
 		printStatement();
+	} else if (match(TOKEN_FOR)) {
+		forStatement();
 	} else if (match(TOKEN_IF)) {
 		ifStatement();
 	} else if (match(TOKEN_WHILE)) {
