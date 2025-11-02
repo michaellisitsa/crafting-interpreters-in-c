@@ -115,6 +115,15 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
 	emitByte(byte1);
 	emitByte(byte2);
 }
+
+static int emitJump(uint8_t instruction) {
+	emitByte(instruction);
+	// Jump offset operand. We will write this after compiling the statement or block
+	emitByte(0xff);
+	emitByte(0xff);
+	return currentChunk()->count - 2;
+}
+
 static void emitReturn() {
 	// Why a separate function for just return?
 	emitByte(OP_RETURN);
@@ -129,6 +138,23 @@ static uint8_t makeConstant(Value value) {
 }
 
 static void emitConstant(Value value) { emitBytes(OP_CONSTANT, makeConstant(value)); }
+static void patchJump(int offset) {
+	// The offset will be from before compiling the statement.
+	int jump = currentChunk()->count - offset - 2;
+	if (jump > UINT16_MAX) {
+		error("Too much code to jump over.");
+	}
+	// We now want to write the position to jump to into that memory address.
+	// We have two bytes that are the high-order and low-order bytes of a two-byte
+	// (16-bit) unsigned value. We need to construct that number
+	// The and will apply a mask with all 1s, and extract the last 8 bits
+	//   0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1
+	// & 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1
+	//   -------------------------------
+	// = 0 0 0 0 0 0 0 0 0 1 0 1 0 1 0 1
+	currentChunk()->code[offset] = (jump >> 8) & 0xff;
+	currentChunk()->code[offset + 1] = jump & 0xff;
+}
 static void initCompiler(Compiler *compiler) {
 	compiler->localCount = 0;
 	compiler->scopeDepth = 0;
@@ -235,6 +261,9 @@ static uint8_t parseVariable(const char *errorMessage) {
 	// Locals are looked up by index rather than name at runtime
 	if (current->scopeDepth > 0)
 		return 0;
+	// Global variable names will get written to the constants table here
+	// The value of the global won't be written as they are lazily evaluated.
+	// It then returns the index of that constant in the constant table.
 	return identifierConstant(&parser.previous);
 }
 static void markInitialized() {
@@ -267,11 +296,32 @@ static void varDeclaration() {
 	consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 	defineVariable(global);
 }
+
 static void expressionStatement() {
 	expression();
 	consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
 	emitByte(OP_POP);
 }
+
+static void ifStatement() {
+	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
+	expression();
+	consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+	int thenJump = emitJump(OP_JUMP_IF_FALSE);
+	// The net stack effect should be zero
+	// and the condition expression won't be used anymore even though its returned a value.
+	emitByte(OP_POP);
+	statement();
+	// Now that we know how far we've progressed,
+	// we can write the location back to the thenJump bytecode argument.
+	int elseJump = emitJump(OP_JUMP);
+	patchJump(thenJump);
+	emitByte(OP_POP);
+	if (match(TOKEN_ELSE))
+		statement();
+	patchJump(elseJump);
+}
+
 static void printStatement() {
 	expression();
 	consume(TOKEN_SEMICOLON, "Expect ';' after value.");
@@ -312,6 +362,8 @@ static void declaration() {
 static void statement() {
 	if (match(TOKEN_PRINT)) {
 		printStatement();
+	} else if (match(TOKEN_IF)) {
+		ifStatement();
 	} else if (match(TOKEN_LEFT_BRACE)) {
 		beginScope();
 		block();
