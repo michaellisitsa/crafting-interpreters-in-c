@@ -17,6 +17,7 @@ VM vm;
 static void resetStack() {
 	// since stack is a pointer this will be its zeroth value
 	vm.stackTop = vm.stack;
+	vm.frameCount = 0;
 }
 
 static void runtimeError(const char *format, ...) {
@@ -25,8 +26,9 @@ static void runtimeError(const char *format, ...) {
 	vfprintf(stderr, format, args);
 	va_end(args);
 	fputs("\n", stderr);
-	size_t instruction = vm.ip - vm.chunk->code - 1;
-	int line = vm.chunk->lines[instruction];
+	CallFrame *frame = &vm.frames[vm.frameCount - 1];
+	size_t instruction = frame->ip - frame->function->chunk.code - 1;
+	int line = frame->function->chunk.lines[instruction];
 	fprintf(stderr, "[line %d] in script\n", line);
 	resetStack();
 }
@@ -72,28 +74,24 @@ static void concatenate() {
 }
 
 InterpretResult interpret(const char *source) {
-	printf("source: '%s'\n", source);
-	printf("first char (int): %d\n", source[0]);
-	Chunk chunk;
-	initChunk(&chunk);
-	if (!compile(source, &chunk)) {
-		freeChunk(&chunk);
-		return INTERPRET_COMPILE_ERROR;
-	}
-	// Give a pointer to the chunk including bytecode to the vm to use
-	vm.chunk = &chunk;
-	vm.ip = vm.chunk->code;
+	ObjFunction *function = compile(source);
+	if (function == NULL)
+		return INTERPRET_RUNTIME_ERROR;
+	push(OBJ_VAL(function));
+	CallFrame *frame = &vm.frames[vm.frameCount++];
+	frame->function = function;
+	frame->ip = function->chunk.code;
+	frame->slots = vm.stack;
 
-	// We are now weaving the source code scanning through to interpreting
-	InterpretResult result = run();
-	freeChunk(&chunk);
-	return result;
+	return run();
 }
 
 static InterpretResult run() {
-#define READ_BYTE() (*vm.ip++)
-#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
-#define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
+	// Get the current frame
+	CallFrame *frame = &vm.frames[vm.frameCount - 1];
+#define READ_BYTE() (*frame->ip++)
+#define READ_CONSTANT() (frame->function->chunk.constants.values[READ_BYTE()])
+#define READ_SHORT() (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(valueType, op)                                                                   \
 	do {                                                                                           \
@@ -116,7 +114,8 @@ static InterpretResult run() {
 		printf("\n");
 		// Since disassemble expects an offset, and vm.ip is a pointer into the code
 		// array directly
-		disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+		disassembleInstruction(&frame->function->chunk,
+							   (int)(frame->ip - frame->function->chunk.code));
 #endif
 		uint8_t instruction;
 		switch (instruction = READ_BYTE()) {
@@ -140,14 +139,14 @@ static InterpretResult run() {
 			break;
 		case OP_GET_LOCAL: {
 			uint8_t slot = READ_BYTE();
-			push(vm.stack[slot]);
+			push(frame->slots[slot]);
 			break;
 		}
 		case OP_SET_LOCAL: {
 			uint8_t slot = READ_BYTE();
 			// We peek at the current value on the value stack, and set the value in the
 			// local stack slot to that value
-			vm.stack[slot] = peek(0);
+			frame->slots[slot] = peek(0);
 			break;
 		}
 		case OP_GET_GLOBAL: {
@@ -239,7 +238,7 @@ static InterpretResult run() {
 			// We don't need to check the condition, likely
 			// if then condition is false, it will jump right past this instruction
 			// like a game of snakes and ladders where you've landed one past the ladder.
-			vm.ip += offset;
+			frame->ip += offset;
 			break;
 		}
 		case OP_JUMP_IF_FALSE: {
@@ -247,12 +246,12 @@ static InterpretResult run() {
 			// stack
 			uint16_t offset = READ_SHORT();
 			if (isFalsey(peek(0)))
-				vm.ip += offset;
+				frame->ip += offset;
 			break;
 		}
 		case OP_LOOP: {
 			uint16_t offset = READ_SHORT();
-			vm.ip -= offset;
+			frame->ip -= offset;
 			break;
 		}
 		case OP_RETURN: {
