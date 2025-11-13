@@ -569,6 +569,42 @@ static void binary(bool canAssign) {
 		return; // Unreachable.
 	}
 }
+
+static uint8_t argumentsList(bool canAssign) {
+	// I want to consume expressions until I stumble onto a comma,
+	// Then I want to loop until I see a closed parenthesis.
+	// Meanwhile I should keep count of the number of arguments I consumed.
+	// Can I leverage the parser to help with parsing the expression?
+	uint8_t count = 0;
+	if (!check(TOKEN_RIGHT_PAREN)) {
+		do {
+			// Guessing that we don't want to parse anything that has higher precedence than
+			// and will consume something like a comma.
+			// But since each parameter will be a full expression, then it will naturally stop
+			// parsing when it hits a comma.
+			expression();
+			if (count == 255) {
+				error("Can't have more than 255 arguments.");
+			}
+			count++;
+		} while (match(TOKEN_COMMA));
+	}
+	consume(TOKEN_RIGHT_PAREN, "Function call must end with ')'");
+	return count;
+}
+
+static void call(bool canAssign) {
+	// In the compiler, we want to emit an instruction for the function to be invoked.
+	// The function would have been placed at the top of the stack by the preceding load const
+	// instruction and the subsequent arguments need to be parsed.
+	//
+	// We also need to pass the arguments count to the OP_CALL instruction. This will determine the
+	// offset backwards at runtime where the function pointer will be stored. We have the arity of
+	// the function from its declaration we can use.
+	uint8_t count = argumentsList(canAssign);
+	emitBytes(OP_CALL, count);
+}
+
 static void literal(bool canAssign) {
 	switch (parser.previous.type) {
 	case TOKEN_FALSE:
@@ -641,8 +677,9 @@ static void unary(bool canAssign) {
 		return;
 	}
 }
+
 ParseRule rules[] = {
-	[TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_NONE},
+	[TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
 	[TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
 	[TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
