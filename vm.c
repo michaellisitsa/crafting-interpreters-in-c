@@ -73,15 +73,20 @@ static void concatenate() {
 	push(OBJ_VAL(result));
 }
 
+static bool call(ObjFunction *function, int argCount) {
+	CallFrame *frame = &vm.frames[vm.frameCount++];
+	frame->function = function;
+	frame->ip = function->chunk.code;
+	frame->slots = vm.stackTop - argCount - 1;
+	return true;
+}
+
 InterpretResult interpret(const char *source) {
 	ObjFunction *function = compile(source);
 	if (function == NULL)
 		return INTERPRET_RUNTIME_ERROR;
 	push(OBJ_VAL(function));
-	CallFrame *frame = &vm.frames[vm.frameCount++];
-	frame->function = function;
-	frame->ip = function->chunk.code;
-	frame->slots = vm.stack;
+	call(function, 0);
 
 	return run();
 }
@@ -257,7 +262,6 @@ static InterpretResult run() {
 		case OP_CALL: {
 			int count = READ_BYTE();
 			// TODO: We need to check if this matches the function arity
-			CallFrame *newFrame = &vm.frames[vm.frameCount++];
 			// The frame's instruction pointer points into the
 			// bytecode chunks which is different.
 			Value functionPointer = peek(count);
@@ -268,11 +272,7 @@ static InterpretResult run() {
 					// We reach this instruction and we know the stack has the
 					// arguments before it. We need to create a new stack frame and enter the new
 					// function. This stack
-					newFrame->ip = function->chunk.code;
-					newFrame->slots = vm.stackTop - count - 1;
-					// I guess I need to extract the function to save to the call frame.
-					newFrame->function = function;
-
+					call(function, count);
 					// The moment of truth, my new frame is ready and filled. Now we can activate it
 					// by pointing frame to it.
 					frame = &vm.frames[vm.frameCount - 1];
