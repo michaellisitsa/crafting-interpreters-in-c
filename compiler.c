@@ -146,6 +146,7 @@ static int emitJump(uint8_t instruction) {
 
 static void emitReturn() {
 	// Why a separate function for just return?
+	// Possibly for closures to hoist any captured variables
 	emitByte(OP_RETURN);
 }
 static uint8_t makeConstant(Value value) {
@@ -461,6 +462,13 @@ static void printStatement() {
 	emitByte(OP_PRINT);
 }
 
+static void returnStatement() {
+	// Evaluate the expression to the right of the return
+	expression();
+	consume(TOKEN_SEMICOLON, "Expect ';' after value.");
+	emitReturn();
+}
+
 static void whileStatement() {
 	int loopStart = currentChunk()->count;
 	// Same as if statement
@@ -515,6 +523,8 @@ static void declaration() {
 static void statement() {
 	if (match(TOKEN_PRINT)) {
 		printStatement();
+	} else if (match(TOKEN_RETURN)) {
+		returnStatement();
 	} else if (match(TOKEN_FOR)) {
 		forStatement();
 	} else if (match(TOKEN_IF)) {

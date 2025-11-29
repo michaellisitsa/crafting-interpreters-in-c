@@ -34,17 +34,17 @@ static void runtimeError(const char *format, ...) {
 	for (int i = vm.frameCount - 1; i > 0; i--) {
 		CallFrame *frame = &vm.frames[i];
 		// What info do we have in the frame
+		// We can pull out the name of the function
+		// And the line where the function was executing.
+		size_t instruction = frame->ip - frame->function->chunk.code - 1;
+		int line = frame->function->chunk.lines[instruction];
 		if (frame->function->name == NULL) {
-			fprintf(stderr, "script\n");
+			fprintf(stderr, "[Line #%d] script\n", line);
 		} else {
-			fprintf(stderr, "Call Frame %s\n", frame->function->name->chars);
+			fprintf(stderr, "[Line #%d] Call Frame %s\n", line, frame->function->name->chars);
 		}
 	}
 
-	CallFrame *frame = &vm.frames[vm.frameCount - 1];
-	size_t instruction = frame->ip - frame->function->chunk.code - 1;
-	int line = frame->function->chunk.lines[instruction];
-	fprintf(stderr, "[line %d] in script\n", line);
 	resetStack();
 }
 void initVM() {
@@ -304,6 +304,7 @@ static InterpretResult run() {
 					}
 					// The moment of truth, my new frame is ready and filled. Now we can activate it
 					// by pointing frame to it.
+					// Call has incremented the frameCount and filled the new frame
 					frame = &vm.frames[vm.frameCount - 1];
 					printf("incremented the frame");
 				}
@@ -314,7 +315,27 @@ static InterpretResult run() {
 			break;
 		}
 		case OP_RETURN: {
-			return INTERPRET_OK;
+			// Store the returning expression in a variable.
+			// The value of the return can be anything, so its a Value.
+			// Peeking but could just as well pop as we're just about to pop the frame off the
+			// stack.
+			Value result = peek(0);
+			vm.frameCount--;
+			if (vm.frameCount == 0) {
+				pop();
+				return INTERPRET_OK;
+			}
+			// Does	OP_RETURN have an operand? Probably not.
+			// We want to decrement the slots pointer to just before the function invocation
+			// This pops off arguments and the function itself.
+			// The frame we currently point to has a slots where its data starts
+			vm.stackTop = frame->slots;
+			// Push the returning value back onto stack.
+			push(result);
+			// frame->slots = vm.stackTop - argCount - 1;
+			// Then we mark the previous frame as the current
+			frame = &vm.frames[vm.frameCount - 1];
+			break;
 		}
 		}
 	}
