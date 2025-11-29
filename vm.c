@@ -20,12 +20,27 @@ static void resetStack() {
 	vm.frameCount = 0;
 }
 
+// Special variable arguments syntax
 static void runtimeError(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 	vfprintf(stderr, format, args);
 	va_end(args);
 	fputs("\n", stderr);
+
+	// We also can print a stack trace
+	// The call frames are stock inside vm.frames
+	// We can walk the list up until fm.frameCount
+	for (int i = vm.frameCount - 1; i > 0; i--) {
+		CallFrame *frame = &vm.frames[i];
+		// What info do we have in the frame
+		if (frame->function->name == NULL) {
+			fprintf(stderr, "script\n");
+		} else {
+			fprintf(stderr, "Call Frame %s\n", frame->function->name->chars);
+		}
+	}
+
 	CallFrame *frame = &vm.frames[vm.frameCount - 1];
 	size_t instruction = frame->ip - frame->function->chunk.code - 1;
 	int line = frame->function->chunk.lines[instruction];
@@ -74,6 +89,16 @@ static void concatenate() {
 }
 
 static bool call(ObjFunction *function, int argCount) {
+	if (argCount != function->arity) {
+		runtimeError("The number of arguments given %d which doesn't match expected %d", argCount,
+					 function->arity);
+		return false;
+	}
+	// We also need to check that the call stack isn't too deep
+	if (vm.frameCount == FRAMES_MAX) {
+		runtimeError("Stack overflow frames=%d", FRAMES_MAX);
+		return false;
+	}
 	CallFrame *frame = &vm.frames[vm.frameCount++];
 	frame->function = function;
 	frame->ip = function->chunk.code;
@@ -86,9 +111,11 @@ InterpretResult interpret(const char *source) {
 	if (function == NULL)
 		return INTERPRET_RUNTIME_ERROR;
 	push(OBJ_VAL(function));
-	call(function, 0);
-
-	return run();
+	if (call(function, 0)) {
+		return run();
+	} else {
+		return INTERPRET_RUNTIME_ERROR;
+	}
 }
 
 static InterpretResult run() {
@@ -272,7 +299,9 @@ static InterpretResult run() {
 					// We reach this instruction and we know the stack has the
 					// arguments before it. We need to create a new stack frame and enter the new
 					// function. This stack
-					call(function, count);
+					if (!call(function, count)) {
+						return INTERPRET_RUNTIME_ERROR;
+					}
 					// The moment of truth, my new frame is ready and filled. Now we can activate it
 					// by pointing frame to it.
 					frame = &vm.frames[vm.frameCount - 1];
