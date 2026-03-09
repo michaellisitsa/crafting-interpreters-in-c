@@ -157,6 +157,7 @@ static TokenType identifierType() {
 }
 
 static Token identifier() {
+	// Identifiers like "var" are consumed
 	while (isAlpha(peek()) || isDigit(peek()))
 		advance();
 	return makeToken(identifierType());

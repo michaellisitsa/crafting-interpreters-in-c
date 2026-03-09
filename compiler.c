@@ -79,6 +79,8 @@ static void error(const char *message) { errorAt(&parser.previous, message); }
 
 static void errorAtCurrent(const char *message) { errorAt(&parser.current, message); }
 
+// This is the single entrypoint into scanning the next part of source code.
+// into a token that get saved onto parser.current.
 static void advance() {
 	parser.previous = parser.current;
 	for (;;) {
@@ -89,18 +91,22 @@ static void advance() {
 	}
 }
 
+// This checks the next token for a match.
+// The setter for parser.current.type is typically `compiler.c -> advance`
+static bool check(TokenType type) { return parser.current.type == type; }
+
 // We're consuming the token from scanner
 // and then if its an error we set the error message
 static void consume(TokenType type, const char *message) {
-	if (parser.current.type == type) {
+	if (check(type)) {
 		advance();
 		return;
 	}
 	errorAtCurrent(message);
 }
 
-static bool check(TokenType type) { return parser.current.type == type; }
-
+// First get the value of the next token, does it match the one we are matching on,
+// then set the new next token using `advance`.
 static bool match(TokenType type) {
 	// We want to check if the given token matches by type
 	if (!check(type))
@@ -229,7 +235,11 @@ static ParseRule *getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
 static void expression() { parsePrecedence(PREC_ASSIGNMENT); }
+
+// Execute all declarations within a block.
 static void block() {
+	// We don't call match because  that has a singular purpose,
+	// check for a match and then advance.
 	while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
 		declaration();
 	}
