@@ -48,6 +48,11 @@ typedef struct Compiler {
 	struct Compiler *enclosing;
 	ObjFunction *function;
 	FunctionType type;
+	// Local variables in nested scopes are all stored in a stack
+	// { var a = 1; // scopeDepth = 1
+	// 	{ var b = 2; } // scopeDepth = 2
+	// }
+	// https://craftinginterpreters.com/local-variables.html#representing-local-variables
 	Local locals[UINT8_COUNT];
 	int localCount;
 	int scopeDepth;

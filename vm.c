@@ -144,7 +144,8 @@ static InterpretResult run() {
 		disassembleInstruction(&frame->function->chunk,
 							   (int)(frame->ip - frame->function->chunk.code));
 		int pad = 50 - getDebugCharsWritten();
-		if (pad < 1) pad = 1;
+		if (pad < 1)
+			pad = 1;
 		printf("%*s", pad, "");
 		for (Value *slot = vm.stack; slot < vm.stackTop; slot++) {
 			printf("[ ");

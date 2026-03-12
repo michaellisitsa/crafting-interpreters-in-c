@@ -86,6 +86,8 @@ static int printFunction(ObjFunction *function) {
 	return printf("<fn %s>", function->name->chars);
 }
 
+// print keyword handles dynamic objects.
+// https://craftinginterpreters.com/strings.html#operations-on-strings
 int printObject(Value value) {
 	switch (OBJ_TYPE(value)) {
 	case OBJ_FUNCTION:

@@ -19,24 +19,22 @@ typedef struct {
 	CallFrame frames[FRAMES_MAX];
 	int frameCount;
 	Chunk *chunk;
-	// pointer because it points into a location in the chunk array
+	// Points into a location in the chunk array
 	uint8_t *ip;
-	// Interesting stackoverflow about Python's approach to store this
-	// https://stackoverflow.com/questions/44346433/in-c-python-accessing-the-bytecode-evaluation-stack
+	// This is the data structure where value stack is kept.
 	// Python stores this in PyFrameObject->f_valuestack
+	// https://stackoverflow.com/questions/44346433/in-c-python-accessing-the-bytecode-evaluation-stack
 	// https://github.com/python/cpython/blob/2.7/Include/frameobject.h#L23
-	// Also excellent explanation of the PyFrameObject
-	// https://shanechang.com/p/python-frames-systems-programming-connection/
+	// PyFrameObject https://shanechang.com/p/python-frames-systems-programming-connection/
 	Value stack[STACK_MAX];
-	// Python stores this in stack_pointer local variable
-	//  Note this is a pointer to the top of the stack
+	// Pointer to the latest value in `stack` Value above.
+	// Python stores in stack_pointer local variable
 	// https://github.com/python/cpython/blob/v3.8.2/Python/ceval.c#L1153
 	Value *stackTop;
 	Table globals;
 	Table strings;
-	// This will allow us to see the head of the list
-	// so we can navigate along all objects. We need a global variable to store the head to start
-	// navigating through.
+	// Linked List head pointer for garbage collector to mark and sweep all dynamically allocated
+	// https://craftinginterpreters.com/strings.html#freeing-objects.
 	Obj *objects;
 } VM;
 

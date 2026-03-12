@@ -23,7 +23,8 @@ typedef enum {
 
 struct Obj {
 	ObjType type;
-	// pointer to next Obj in the chain
+	// pointer to next Obj in the chain used for garbage collector.
+	// Introduced in https://craftinginterpreters.com/strings.html#freeing-objects
 	struct Obj *next;
 };
 
