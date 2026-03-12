@@ -135,19 +135,23 @@ static InterpretResult run() {
 		double a = AS_NUMBER(pop());                                                               \
 		push(valueType(a op b));                                                                   \
 	} while (false)
+#ifdef DEBUG_TRACE_EXECUTION
+	printf("%-5s%4s %-16s %4s %-18s%s\n", "BYTE", "LN", "OPCODE", "ARG", "VAL", "STACK");
+#endif
 	for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
-		// Get visibility into the value stack
+		// Print instruction first, then pad to fixed column, then stack
+		disassembleInstruction(&frame->function->chunk,
+							   (int)(frame->ip - frame->function->chunk.code));
+		int pad = 50 - getDebugCharsWritten();
+		if (pad < 1) pad = 1;
+		printf("%*s", pad, "");
 		for (Value *slot = vm.stack; slot < vm.stackTop; slot++) {
 			printf("[ ");
 			printValue(*slot);
 			printf(" ]");
 		}
 		printf("\n");
-		// Since disassemble expects an offset, and vm.ip is a pointer into the code
-		// array directly
-		disassembleInstruction(&frame->function->chunk,
-							   (int)(frame->ip - frame->function->chunk.code));
 #endif
 		uint8_t instruction;
 		switch (instruction = READ_BYTE()) {
@@ -306,7 +310,6 @@ static InterpretResult run() {
 					// by pointing frame to it.
 					// Call has incremented the frameCount and filled the new frame
 					frame = &vm.frames[vm.frameCount - 1];
-					printf("incremented the frame");
 				}
 				default:
 					break;

@@ -52,6 +52,6 @@ void initValueArray(ValueArray *array);
 void writeValueArray(ValueArray *array, Value value);
 // TODO: add a free array method
 void freeValueArray(ValueArray *array);
-void printValue(Value value);
+int printValue(Value value);
 
 #endif

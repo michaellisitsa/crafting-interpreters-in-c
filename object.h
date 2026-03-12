@@ -47,7 +47,7 @@ ObjFunction *newFunction();
 ObjString *takeString(char *chars, int length);
 ObjString *copyString(const char *chars, int length);
 
-void printObject(Value value);
+int printObject(Value value);
 static inline bool isObjType(Value value, ObjType type) {
 	// Since we use value twice, a macro would evaluate it twice. So we need a normal function
 	return IS_OBJ(value) && AS_OBJ(value)->type == type;

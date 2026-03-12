@@ -3,15 +3,21 @@
 #include "value.h"
 #include <stdio.h>
 
+static int debugCharsWritten;
+
+int getDebugCharsWritten() { return debugCharsWritten; }
+
 void disassembleChunk(Chunk *chunk, const char *name) {
 	printf("== %s ==\n", name);
+	printf("%-5s%4s %-16s %4s %s\n", "BYTE", "LN", "OPCODE", "ARG", "VAL");
 	for (int offset = 0; offset < chunk->count;) {
 		offset = disassembleInstruction(chunk, offset);
+		printf("\n");
 	}
 }
 
 static int simpleInstruction(const char *name, int offset) {
-	printf("%s\n", name);
+	debugCharsWritten += printf("%-16s", name);
 	// What's the next bytecode to show.
 	return offset + 1;
 }
@@ -21,14 +27,14 @@ static int byteInstruction(const char *name, Chunk *chunk, int offset) {
 	// So we just get the value of the arg to the op code which will point us to the slot in the
 	// locals array
 	uint8_t slot = chunk->code[offset + 1];
-	printf("%-16s %4d\n", name, slot);
+	debugCharsWritten += printf("%-16s %4d", name, slot);
 	return offset + 1;
 }
 
 static int jumpInstruction(const char *name, int sign, Chunk *chunk, int offset) {
 	uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8);
 	jump |= chunk->code[offset + 2];
-	printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+	debugCharsWritten += printf("%-16s %4d -> %d", name, offset, offset + 3 + sign * jump);
 	return offset + 3;
 }
 
@@ -36,19 +42,20 @@ static int constantInstruction(const char *name, Chunk *chunk, int offset) {
 	// Same as simple instruction but also print the item at the location
 	// of the constants array at the offset
 	uint8_t constant = chunk->code[offset + 1];
-	printf("%-16s %4d '", name, constant);
-	printValue(chunk->constants.values[constant]);
-	printf("'\n");
+	debugCharsWritten += printf("%-16s %4d '", name, constant);
+	debugCharsWritten += printValue(chunk->constants.values[constant]);
+	debugCharsWritten += printf("'");
 	return offset + 2;
 }
 
 int disassembleInstruction(Chunk *chunk, int offset) {
-	printf("%04d ", offset);
+	debugCharsWritten = 0;
+	debugCharsWritten += printf("%04d ", offset);
 	if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
 		// don't print the line number again
-		printf("    | ");
+		debugCharsWritten += printf("   | ");
 	} else {
-		printf("%4d ", chunk->lines[offset]);
+		debugCharsWritten += printf("%4d ", chunk->lines[offset]);
 	}
 	uint8_t instruction = chunk->code[offset];
 	switch (instruction) {
@@ -106,7 +113,7 @@ int disassembleInstruction(Chunk *chunk, int offset) {
 	case OP_CALL:
 		return byteInstruction("OP_CALL", chunk, offset);
 	default:
-		printf("Unknown OpCode %d\n", instruction);
+		debugCharsWritten += printf("Unknown OpCode %d", instruction);
 		return offset + 1;
 	}
 }

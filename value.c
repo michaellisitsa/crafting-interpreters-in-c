@@ -36,21 +36,18 @@ void freeValueArray(ValueArray *array) {
 	// memory
 	initValueArray(array);
 }
-void printValue(Value value) {
+int printValue(Value value) {
 	switch (value.type) {
 	case VAL_BOOL:
-		printf(AS_BOOL(value) ? "true" : "false");
-		break;
+		return printf(AS_BOOL(value) ? "true" : "false");
 	case VAL_NIL:
-		printf("nil");
-		break;
+		return printf("nil");
 	case VAL_NUMBER:
-		printf("%g", AS_NUMBER(value));
-		break;
+		return printf("%g", AS_NUMBER(value));
 	case VAL_OBJ:
-		printObject(value);
-		break;
+		return printObject(value);
 	}
+	return 0;
 }
 
 bool valuesEqual(Value a, Value b) {

@@ -7,7 +7,7 @@ set(CMAKE_BUILD_TYPE Debug)
 # C compiler on the system will be used
 project(main C)
 
-add_executable(main
+set(SOURCES
 	main.c
 	chunk.c
 	memory.c
@@ -19,4 +19,10 @@ add_executable(main
 	object.c
 	table.c
 )
+
+add_executable(main ${SOURCES})
+add_executable(maindbg ${SOURCES})
+target_compile_definitions(maindbg PRIVATE "BUILD_B=1")
+add_executable(maindump ${SOURCES})
+target_compile_definitions(maindump PRIVATE "BUILD_C=1")
 
