@@ -28,7 +28,7 @@ static int byteInstruction(const char *name, Chunk *chunk, int offset) {
 	// locals array
 	uint8_t slot = chunk->code[offset + 1];
 	debugCharsWritten += printf("%-16s %4d", name, slot);
-	return offset + 1;
+	return offset + 2; // 2 to account for operand
 }
 
 static int jumpInstruction(const char *name, int sign, Chunk *chunk, int offset) {

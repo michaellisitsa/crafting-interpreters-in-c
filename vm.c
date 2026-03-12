@@ -325,6 +325,7 @@ static InterpretResult run() {
 			// stack.
 			Value result = peek(0);
 			vm.frameCount--;
+			// This is the exit point once all the frames have been popped.
 			if (vm.frameCount == 0) {
 				pop();
 				return INTERPRET_OK;

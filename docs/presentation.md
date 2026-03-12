@@ -1,5 +1,14 @@
 ---
 marp: true
+style: |
+  .columns {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+  }
+  .columns > div {
+    flex: 1;
+  }
 ---
 
 # Crafting Interpreters
@@ -10,6 +19,7 @@ marp: true
 
 - Demo showing it working.
     - Cool example programs that work
+    - function.lox - Call stack,
 - Virtual machine bytecode
 - Global hash table
     - Implemented from scratch. Each interned string has its own hash, max load, tombstone. Good fodder for next AOC.
@@ -37,3 +47,52 @@ marp: true
 - Interesting projects
     - Maths evaluation -> Math.JS. Uses Javascript call stack and closures to compile an AST into a Javascript function.
     - [Nearley](https://omrelli.ug/nearley-playground/) - Generic lexer written in JS.
+
+---
+
+# A fully functioning language:
+- Global and local variables
+- Control Flow
+- Functions
+- Dynamically Typed
+- Garbage Collector
+
+---
+
+# Pipeline of a language
+- Scanner (Source code to tokens)
+- Compiler (Tokens to Bytecode)
+- Virtual Machine (Execute bytecode)
+
+---
+
+# Bytecode Interpreter
+
+<div class="columns">
+<div>
+
+```js
+1 {
+2   var a = 1;
+3   {
+4     print 2+a;
+5   }
+6 }
+```
+
+</div>
+<div>
+
+```
+BYTE   LN OPCODE            ARG VAL
+0000    2 OP_CONSTANT         0 '1'
+0002    4 OP_CONSTANT         1 '2'
+0004    | OP_GET_LOCAL        1
+0006    | OP_ADD
+0007    | OP_PRINT
+0008    6 OP_POP
+0009    7 OP_RETURN
+```
+
+</div>
+</div>
