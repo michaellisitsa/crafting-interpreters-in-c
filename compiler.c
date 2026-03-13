@@ -746,12 +746,32 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE},
 };
 
+// For debugging
+const char *precedenceNames[] = {"PREC_NONE",	  "PREC_ASSIGNMENT", "PREC_OR",		"PREC_AND",
+								 "PREC_EQUALITY", "PREC_COMPARISON", "PREC_TERM",	"PREC_FACTOR",
+								 "PREC_UNARY",	  "PREC_CALL",		 "PREC_PRIMARY"};
 // This is a recursive function
 // When it calls the prefix rule function, that function
 // e.g. unary, binary may call this again
 // There is a diagram about how this works on
 // https://craftinginterpreters.com/compiling-expressions.html#parsing-with-precedence
+//
+//	 Example: 1+2*3
+//			   +
+//			  / \
+//			 1   *
+//			    / \
+//			   2   3
+//		 Depth 1: precedence = ASSIGNMENT
+//			 1. Consume 1 (prefixRule -> number).
+//			 2. Consume + (InfixRule -> binary)
+//		 Depth 2: precedence = TERM + 1 == FACTOR
+//			 3. Consume 2 (prefixRule -> number)
+//			 4. Consume * (infixRule -> binary)
+//		 Depth 3: precendence = FACTOR + 1 == UNARY
+//			 5. Consume 3 (prefixRule -> number)
 static void parsePrecedence(Precedence precedence) {
+	printf("precedence %s\n", precedenceNames[precedence]);
 	advance();
 	// We get the rule for the token we're on,
 	// i.e. what its ParseFn for infix, prefix and infix precedence

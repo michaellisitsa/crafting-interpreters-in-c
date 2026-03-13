@@ -9,6 +9,10 @@ style: |
   .columns > div {
     flex: 1;
   }
+  .reveal { opacity: 0; transition: opacity 0.3s; }
+  .reveal:hover { opacity: 1; }
+  .green {color: green;}
+  .red {color: red;}
 ---
 
 # Crafting Interpreters
@@ -66,6 +70,92 @@ style: |
 
 ---
 
+# Scanning
+
+## Left-to-Right order vs. Bytecode order
+
+<div class="columns">
+<div>
+
+```
+    1 + 2 * 3 
+     same as
+        +
+       / \
+      1   *
+         / \
+        2   3
+```
+
+
+</div>
+<div>
+
+```
+
+__OPCODE__      __VAL__
+OP_CONSTANT        1
+OP_CONSTANT        2
+OP_CONSTANT        3
+OP_MULTIPLY
+OP_ADD
+
+```
+
+</div>
+</div>
+
+- Implemented as 1-pass-compiler, emits bytecode, no intermediate representation. 
+- One-pass:   Lua, TurboPascal, C
+- Multi-pass: Python, Java, C#
+___What language features do Multi-pass compilers enable?___
+
+---
+
+# 1-pass vs Multi-pass
+
+
+<div class="columns">
+<div>
+
+Python
+```py
+
+x = 10
+def foo():
+    print(x)
+    x += 1
+foo()
+
+```
+
+<a class="reveal red" href="https://docs.python.org/3/faq/programming.html#why-am-i-getting-an-unboundlocalerror-when-the-variable-has-a-value">
+UnboundLocalError: cannot access local variable 'x' where it is not associated with a value
+</a>
+
+</div>
+<div>
+
+Lox
+```lox
+
+var x = 10;
+fun foo(){
+    print x;
+    x = x + 1;
+}
+foo();
+
+```
+<p class="reveal green">10 // 1-pass compiler doesn't know about local assignment</p>
+
+</div>
+</div>
+
+<span class="reveal"> How would you fix the python to make it work?</span>
+
+---
+
 # Bytecode Interpreter
 
 <div class="columns">
@@ -96,3 +186,21 @@ BYTE   LN OPCODE            ARG VAL
 
 </div>
 </div>
+
+# Logic Control
+
+
+---
+
+# Example: Parsing
+1+2*3
+Depth 1: precedence = ASSIGNMENT
+1. Consume 1 (prefixRule -> number).
+2. Consume + (InfixRule -> binary)
+Depth 2: precedence = TERM + 1 == FACTOR
+3. Consume 2 (prefixRule -> number)
+4. Consume * (infixRule -> binary)
+Depth 3: precendence = FACTOR + 1 == UNARY
+5. Consume 3 (prefixRule -> number)
+While loop finishes. Since the next token is less precedence PREC_NONE.
+
