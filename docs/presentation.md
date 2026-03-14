@@ -187,8 +187,360 @@ BYTE   LN OPCODE            ARG VAL
 </div>
 </div>
 
-# Logic Control
+---
 
+# What is a Value?
+
+<div class="columns">
+<div>
+
+```c
+// 16 bytes — same size for every type
+typedef struct {
+  ValueType type;
+  union {
+    bool   boolean;
+    double number;
+    Obj*   obj;
+  } as;
+} Value;
+```
+
+</div>
+<div>
+
+```
+VAL_NUMBER │ type=NUM  │  3.14        │
+VAL_BOOL   │ type=BOOL │  true        │
+VAL_NIL    │ type=NIL  │  -           │
+VAL_OBJ    │ type=OBJ  │  ptr ──►heap │
+```
+
+Numbers and booleans stored **inline**
+
+Strings, functions → heap pointer (`Obj*`)
+
+</div>
+</div>
+
+> Python stores **everything** as a heap object — even small integers
+> Lox numbers are bare C `double` values: no boxing, no allocation
+
+---
+
+# Hash Table vs Value Stack
+
+<div class="columns">
+<div>
+
+**Hash Table** _(lookup by name string)_
+```
+globals:
+  "score"  → 42.0
+  "name"   → Obj* → "Alice"
+  "greet"  → Obj* → <fn greet>
+
+interned strings:
+  "hello"  → Obj* → "hello"
+  "world"  → Obj* → "world"
+```
+Top-level variables, functions,
+and every string literal (interned once)
+
+</div>
+<div>
+
+**Value Stack** _(lookup by slot index)_
+```
+slot 0: <script fn>
+slot 1: 42.0        ← var a = 42
+slot 2: Obj* → "hi" ← var s = "hi"
+slot 3: (temp expr)
+```
+Local variables, temporaries,
+function args — **no name lookup needed**
+
+</div>
+</div>
+
+**Interned strings:** `"hello" == "hello"` is a pointer compare — O(1)
+
+Every string literal is stored once in the hash table; duplicates share the same `Obj*`
+
+---
+
+# Call Frame
+
+Each function has its **own bytecode + constants pool**. The value stack is one flat array.
+
+<div class="columns">
+<div>
+
+```lox
+fun double(n) { return n * 2; }
+fun calc(x) {
+  return double(x) + 1;
+}
+calc(5);
+```
+
+Value stack while `double(5)` runs:
+```
+[0] <script>   ← frame 0 base
+[1] calc       ← frame 1 base
+[2]  5           x  (calc's arg)
+[3] double     ← frame 2 base
+[4]  5           n  (double's arg)
+```
+
+Each call starts with a **function pointer**
+then its **arguments** on the stack
+
+</div>
+<div>
+
+```c
+typedef struct {
+  ObjFunction* function;
+  // ↑ has its OWN chunk:
+  //   bytecode + constants array
+  uint8_t* ip;    // current instruction
+  Value*   slots; // → into stack
+} CallFrame;
+```
+
+```
+frame 0  slots=stack[0]  ip→script code
+frame 1  slots=stack[1]  ip→calc code
+frame 2  slots=stack[3]  ip→double code
+```
+
+`OP_GET_LOCAL 1` in `double`
+  reads `slots[1]` = `stack[4]` = `n`
+
+`OP_CONSTANT 0` in `double`
+  reads `double`'s `constants[0]`
+  — completely separate from `calc`'s!
+
+</div>
+</div>
+
+---
+
+# Conditionals: Jump If False
+
+<div class="columns">
+<div>
+
+```lox
+if (score > 90) {
+  print "pass";
+} else {
+  print "fail";
+}
+```
+
+![if-else jump diagram](https://craftinginterpreters.com/image/jumping-back-and-forth/if-else.png)
+
+</div>
+<div>
+
+```
+0000 OP_GET_GLOBAL    'score'
+0002 OP_CONSTANT      90
+0004 OP_GREATER
+0005 OP_JUMP_IF_FALSE  ──► 0015
+0007 OP_POP
+0008 OP_CONSTANT      'pass'
+0010 OP_PRINT
+0011 OP_JUMP           ──► 0019
+0013 OP_POP            ◄── else branch
+0014 OP_CONSTANT      'fail'
+0016 OP_PRINT
+```
+
+</div>
+</div>
+
+- `OP_JUMP_IF_FALSE`: peek stack top, jump **forward** if falsy
+- `OP_JUMP`: unconditional forward jump to skip the else branch
+- Python's `dis` shows the same: `POP_JUMP_IF_FALSE`
+
+---
+
+# Loops: Jumping Backwards
+
+<div class="columns">
+<div>
+
+```lox
+var i = 0;
+while (i < 3) {
+  print i;
+  i = i + 1;
+}
+```
+
+`OP_JUMP` always jumps **forward** ↓
+
+`OP_LOOP` always jumps **backward** ↩
+
+`for` loops compile to the same
+`OP_LOOP` instruction — just
+syntactic sugar over `while`
+
+> Python's `for` over a range compiles
+> to `GET_ITER` + `FOR_ITER` —
+> same backward-jump pattern
+
+</div>
+<div>
+
+```
+0000 OP_CONSTANT      0
+0002 OP_DEFINE_GLOBAL 'i'
+     ┌──────────────────── loop_start
+0004 │ OP_GET_GLOBAL  'i'
+0006 │ OP_CONSTANT    3
+0008 │ OP_LESS
+0009 │ OP_JUMP_IF_FALSE ──► 0025
+0011 │ OP_POP
+0012 │ OP_GET_GLOBAL  'i'
+0014 │ OP_PRINT
+0015 │ OP_GET_GLOBAL  'i'
+0017 │ OP_CONSTANT    1
+0019 │ OP_ADD
+0020 │ OP_SET_GLOBAL  'i'
+0022 │ OP_POP
+0023 └─ OP_LOOP ◄──────────
+0025 OP_POP
+```
+
+</div>
+</div>
+
+---
+
+# Dynamic Typing
+
+<div class="columns">
+<div>
+
+```c
+// Every operation checks types at runtime
+case OP_ADD: {
+  if (IS_STRING(peek(0)) &&
+      IS_STRING(peek(1))) {
+    concatenate();       // string cat
+  } else if (IS_NUMBER(peek(0)) &&
+             IS_NUMBER(peek(1))) {
+    double b = AS_NUMBER(pop());
+    double a = AS_NUMBER(pop());
+    push(NUMBER_VAL(a + b));
+  } else {
+    runtimeError("type mismatch");
+  }
+}
+```
+
+</div>
+<div>
+
+```lox
+print 1 + 2;       // 3
+print "a" + "b";   // "ab"
+print 1 + "b";     // runtime error!
+```
+
+`IS_OBJ(val)` → follow pointer
+→ read `obj->type` (cache miss risk)
+
+Like Python's duck typing —
+but with explicit type tags
+instead of `__add__` method lookup
+
+No compile-time type guarantees:
+errors surface at runtime, just
+like Python's `TypeError`
+
+</div>
+</div>
+
+---
+
+# Garbage Collector: Mark & Sweep
+
+<div class="columns">
+<div>
+
+All heap objects form an intrusive linked list:
+
+```c
+struct Obj {
+  ObjType type;
+  bool    isMarked;
+  Obj*    next;    // ← linked list
+};
+```
+
+Every `malloc`'d object is chained
+into `vm.objects` at allocation time
+
+</div>
+<div>
+
+**Mark phase** — start from roots:
+- Value stack (locals, temporaries)
+- Hash table (globals, interned strings)
+
+Follow every `Obj*` pointer recursively,
+set `isMarked = true` on each
+
+**Sweep phase:**
+Walk the `vm.objects` linked list,
+`free()` any object still unmarked,
+reset `isMarked` on survivors
+
+</div>
+</div>
+
+- Python uses **reference counting** first — objects freed instantly when count → 0
+- Python's `gc` module adds mark-and-sweep **only for reference cycles**
+- Lox skips reference counting entirely — simpler code, but GC pauses
+
+---
+
+# Compiling vs Interpreting
+
+```
+Source ──► Scanner ──► Compiler ──► ObjFunction { chunk: bytecode + constants }
+                                              │
+                                      vm.interpret()
+                                              │
+                                          run() loop  ← while(true) switch(READ_BYTE())
+                                              │
+                              OP_CALL ──► new CallFrame  (no recompile!)
+                                              │
+                                     function already has its bytecode
+```
+
+- All bytecode is compiled **before `run()` starts**
+- `OP_CALL` at runtime just creates a new `CallFrame` pointing at pre-compiled bytecode
+- Like Python's `.pyc` files — but compiled on-the-fly, never saved to disk
+
+---
+
+# Interesting Projects
+
+**[Math.js](https://mathjs.org/)** — expression evaluator in JS
+
+Compiles math expressions to an AST, then to a JS closure.
+Uses the JS engine's own call stack and closures as its "VM".
+
+**[Nearley](https://omrelli.ug/nearley-playground/)** — generic parser in JS
+
+Define a grammar in BNF-like syntax, get a parser back.
+Try the browser playground — watch tokens get parsed in real time.
 
 ---
 
