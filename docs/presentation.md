@@ -192,6 +192,14 @@ BYTE   LN OPCODE            ARG VAL
 
 ---
 
+# what i learnt
+ I gained a rough understanding of language processing systems — things like bytecode, and stack-machine VMs that I’d only known as terminology, 
+I now understand through building them. I became interested in trying languages I’d never touched before.
+Analyzing languages by what abstractions they make.
+e.g. why lua is a great language to embed because its smaller footprint
+e.g. what is so amazing about python's adaptive interpreter.
+---
+
 # Example: Parsing
 1+2*3
 Depth 1: precedence = ASSIGNMENT
